@@ -162,7 +162,7 @@ class RunStart(BaseModel):
     config: dict
     edges: list[tuple[int, int]]      # topology, so metrics can compute centrality
     facts: list[str]                  # ground truth, section i -> fact
-    fact_holder: list[int]            # section i -> agent who knows it
+    fact_holder: list[list[int]]            # section i -> agent who knows it
     ts: float = Field(default_factory=time.time)
 
 

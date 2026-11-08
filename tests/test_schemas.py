@@ -42,7 +42,7 @@ def test_parse_turn_rejects(raw):
 def test_log_records_roundtrip():
     recs = [
         RunStart(run_id="r", config_hash="h", seed=0, config={}, edges=[(0, 1)],
-                 facts=["a"] * 6, fact_holder=list(range(6))),
+                 facts=["a"] * 6, fact_holder=[[0, 1]] * 6),
         TurnLog(run_id="r", round=1, agent_id=0, model="m", observation={}, raw_output="{}",
                 action={"type": "pass"}, valid_json=False, result={"ok": True}, credits_after=2),
         RoundEnd(run_id="r", round=1, pool=34, credits=[2] * 6, alive=[True] * 6,
