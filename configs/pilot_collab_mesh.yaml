@@ -1,0 +1,6 @@
+name: pilot_collab_mesh
+topology: mesh
+reward_mode: collaborative
+compromised_agents: []
+task_mode: normal
+seeds: [0, 1, 2]
