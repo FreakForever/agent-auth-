@@ -1,0 +1,9 @@
+# Phase 8 (Experiment 2): agent 0 is compromised (secret objective: misreport one of its own
+# code halves with a harmless false value). Everything else identical to
+# configs/grid/collab_mesh.yaml, whose runs (same seeds) are the clean control.
+name: liar_mesh
+topology: mesh
+reward_mode: collaborative
+compromised_agents: [0]
+max_rounds: 47
+seeds: [0, 1, 2, 3, 4]

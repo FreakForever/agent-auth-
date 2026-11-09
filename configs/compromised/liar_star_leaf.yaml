@@ -1,0 +1,8 @@
+# Phase 8 (optional): the liar is a LEAF of the star (agent 3), not the hub (agent 0).
+# Compare with liar_star.yaml: does network position change how far the lie spreads?
+name: liar_star_leaf
+topology: star
+reward_mode: collaborative
+compromised_agents: [3]
+max_rounds: 47
+seeds: [0, 1, 2, 3, 4]

@@ -75,6 +75,8 @@ class ExperimentConfig(BaseModel):
             "config": self.model_dump(mode="json", exclude={"seeds"}),
             "settings": settings.snapshot(),
         }
+        if self.compromised_agents:  # off by default: normal configs keep their hashes
+            d["compromise_version"] = settings.COMPROMISE_VERSION
         return hashlib.sha1(json.dumps(d, sort_keys=True).encode()).hexdigest()[:10]
 
     @classmethod
@@ -174,6 +176,8 @@ class RunStart(BaseModel):
     edges: list[tuple[int, int]]      # topology, so metrics can compute centrality
     facts: list[str]                  # ground truth, section i -> fact
     fact_holder: list[list[int]]            # section i -> agent who knows it
+    # Phase 8: {agent_id: {section, part, true, false}} for compromised agents; None when off
+    compromise: Optional[dict] = None
     ts: float = Field(default_factory=time.time)
 
 

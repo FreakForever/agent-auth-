@@ -99,6 +99,19 @@ class SharerBot(Bot):
         return _turn({"type": "pass"}, "nothing to do")
 
 
+class LiarBot(SharerBot):
+    """Phase 8 validation bot: behaves like a sharer, but always reports its secret target
+    half with the false value (from obs["secret"]) and never reveals the true one."""
+
+    kind = "liar"
+
+    def _learn(self, obs):
+        super()._learn(obs)
+        sec = obs.get("secret")
+        if sec:
+            self.known[(sec["section"], sec["part"])] = sec["false"]
+
+
 class ProposerBot(SharerBot):
     """A sharer that also proposes plans every few rounds (for leadership tests)."""
 
@@ -176,7 +189,7 @@ class BrokenBot(Bot):
 
 
 BOT_TYPES = {
-    "sharer": SharerBot, "proposer": ProposerBot, "hoarder": HoarderBot,
+    "sharer": SharerBot, "liar": LiarBot, "proposer": ProposerBot, "hoarder": HoarderBot,
     "random": RandomBot, "specialist": SpecialistBot, "broken": BrokenBot,
 }
 
