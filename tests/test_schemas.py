@@ -24,6 +24,9 @@ def test_config_hash_changes_with_prompt_version_and_settings(monkeypatch):
     assert c.config_hash() == h
     monkeypatch.setattr(settings, "AGENT_START_CREDITS", 999)
     assert c.config_hash() != h
+    monkeypatch.undo()
+    monkeypatch.setattr(settings, "ENGINE_VERSION", "e-test")
+    assert c.config_hash() != h
 
 
 def test_snapshot_excludes_endpoint_and_paths():

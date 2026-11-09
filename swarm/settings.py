@@ -6,6 +6,9 @@ the per-condition config (Phase 1). These values stay fixed across conditions.
 import os
 
 # Bump on ANY change to prompt text in swarm/agents/llm_agent.py. Part of config_hash().
+# Bump on any change to World mechanics (termination, credits, grading) that the config
+# doesn't capture. Part of config_hash(), so old logs are never resumed under new rules.
+ENGINE_VERSION = "e2"  # e2: stall back to document-only after pilot v7
 PROMPT_VERSION = "v6"  # v5: write-affordability line; v6: it counts upkeep, solo prompt has no comms actions
 
 # ---- Serving ----

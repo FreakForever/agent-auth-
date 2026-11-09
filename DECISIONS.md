@@ -44,12 +44,13 @@ hoarding can starve agents.
 ## Rounds and termination
 - One round = every live agent observes, takes one action, then the world updates.
 - Messages sent in round t are delivered at the start of round t+1.
-- A run ends on: success (6/6 correct), all agents dead, stall
-  (10 rounds with no progress: the file did not change and no credits were claimed or
-  given; upkeep alone does not count. Changed 2026-11-09: a document-only rule ended runs
-  while an agent was saving credits to write), or the ceiling (100 rounds).
-- Pilot runs use the ceiling only; the final cap is set from the pilot's
-  turn distribution (about 1.5-2x the 90th percentile).
+- A run ends on: success (6/6 correct), all agents dead, stall (10 rounds with no
+  change to the file), or the round cap. Briefly (pilot v7) claims also counted as
+  progress for the stall check; reverted because lone hoarders then kept runs alive to
+  the ceiling.
+- Pilot runs used the 100-round ceiling. **Final cap: `max_rounds: 47`** (set 2026-11-09)
+  = 2 x p90 of turns (23.3) over pilot v8 multi-agent runs (prompt v6, engine e2). No
+  pilot run hit the ceiling; longest 38 rounds. Too few successes to use success-only p90.
 
 ## Memory
 - Injected verbatim every round: role, incentive text, own fact, own balance,

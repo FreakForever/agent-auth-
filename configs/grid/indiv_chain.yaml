@@ -1,0 +1,6 @@
+# Phase 6 grid: topology=chain, reward=individual. max_rounds from pilot v8 (see DECISIONS.md).
+name: grid_indiv_chain
+topology: chain
+reward_mode: individual
+max_rounds: 47
+seeds: [0, 1, 2, 3, 4]

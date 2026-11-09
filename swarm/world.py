@@ -148,8 +148,7 @@ class World:
         self._outbox: list[tuple[int, int, str]] = []  # (from, to, text) sent this round
         self.proposals: dict[str, _Proposal] = {}
         self.invalid_json = 0
-        self._doc_unchanged_rounds = 0   # rounds with no progress (see _step's stall check)
-        self._credits_moved = False
+        self._doc_unchanged_rounds = 0
         self.history: list[list[dict]] = [[] for _ in range(self.n)]  # own past actions
 
     # -- topology ---------------------------------------------------------
@@ -209,7 +208,6 @@ class World:
             granted = min(act.amount, self.pool_credits)
             self.pool_credits -= granted
             self.credits[a] += granted
-            self._credits_moved |= granted > 0
             return {"ok": granted > 0, "detail": f"granted {granted}/{act.amount}",
                     "granted": granted}
 
@@ -220,7 +218,6 @@ class World:
                 return {"ok": False, "detail": "insufficient credits"}
             self.credits[a] -= act.amount
             self.credits[act.to] += act.amount
-            self._credits_moved = True
             return {"ok": True, "detail": f"gave {act.amount} to {act.to}",
                     "to": act.to, "amount": act.amount}
 
@@ -294,7 +291,6 @@ class World:
 
         # 4. resolve in seeded random order
         doc_before = list(self.document)
-        self._credits_moved = False
         order = live[:]
         self.order_rng.shuffle(order)
         for a in order:
@@ -334,10 +330,11 @@ class World:
             credits=list(self.credits), alive=list(self.alive),
             document=list(self.document), rewards=self._rewards(),
         ))
-        # progress = the document changed, or credits were claimed/given (saving up to write
-        # is progress). Upkeep alone is not. Stall = stall_rounds rounds without progress.
-        progressed = self.document != doc_before or self._credits_moved
-        self._doc_unchanged_rounds = 0 if progressed else self._doc_unchanged_rounds + 1
+        # stall = document unchanged for stall_rounds rounds. Counting claims as progress was
+        # tried (pilot v7) and reverted: lone hoarders then kept runs alive to max_rounds.
+        self._doc_unchanged_rounds = (
+            self._doc_unchanged_rounds + 1 if self.document == doc_before else 0
+        )
 
         if self.facts_correct() == settings.N_SECTIONS:
             return Outcome.success

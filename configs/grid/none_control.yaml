@@ -1,0 +1,6 @@
+# Control: no messaging. Should score 0 guessed sections (relays via the document are reported separately).
+name: grid_none
+topology: none
+reward_mode: collaborative
+max_rounds: 47
+seeds: [0, 1, 2, 3, 4]
