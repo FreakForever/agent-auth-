@@ -9,7 +9,10 @@ import os
 # Bump on any change to World mechanics (termination, credits, grading) that the config
 # doesn't capture. Part of config_hash(), so old logs are never resumed under new rules.
 ENGINE_VERSION = "e2"  # e2: stall back to document-only after pilot v7
-PROMPT_VERSION = "v6"  # v5: write-affordability line; v6: it counts upkeep, solo prompt has no comms actions
+PROMPT_VERSION = "v6"
+# Phase 8 compromised-agent mode (liar prompt + target selection). Added to config_hash ONLY
+# when compromised_agents is non-empty, so normal configs keep their hashes.
+COMPROMISE_VERSION = "c1"  # v5: write-affordability line; v6: it counts upkeep, solo prompt has no comms actions
 
 # ---- Serving ----
 VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")
@@ -54,7 +57,7 @@ def snapshot() -> dict:
     Included in ExperimentConfig.config_hash() so runs never mix across settings or
     prompt versions.
     """
-    exclude = {"VLLM_BASE_URL", "VLLM_API_KEY", "ROOT", "LOG_DIR", "CONFIG_DIR"}
+    exclude = {"VLLM_BASE_URL", "VLLM_API_KEY", "ROOT", "LOG_DIR", "CONFIG_DIR", "COMPROMISE_VERSION"}
     return {
         k: v for k, v in globals().items()
         if k.isupper() and k not in exclude and isinstance(v, (int, float, str, bool))

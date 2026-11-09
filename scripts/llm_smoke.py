@@ -52,16 +52,21 @@ def main():
     p.add_argument("--rounds", type=int, default=15)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--no-json-mode", action="store_true")
+    p.add_argument("--compromised", type=int, nargs="*", default=[],
+                   help="Phase 8: compromised agent id(s), e.g. --compromised 0")
     a = p.parse_args()
 
     cfg = ExperimentConfig(name="smoke", topology=a.topology, reward_mode=a.reward,
-                           max_rounds=a.rounds, seeds=[a.seed])
+                           max_rounds=a.rounds, seeds=[a.seed], compromised_agents=a.compromised)
     pool = LLMPool(cfg, a.seed, json_mode=not a.no_json_mode)
     pool.preflight()
     world = World(cfg, a.seed, pool, None)
     path = os.path.join(settings.LOG_DIR, f"{world.run_id}.jsonl")
     print(f"model={settings.MODEL_NAME}  run={world.run_id}")
-    print(f"ground truth: {world.facts}\n")
+    print(f"ground truth: {world.facts}")
+    if world.compromise:
+        print(f"compromised: {world.compromise}")
+    print()
 
     with PrintingLogger(path) as lg:
         world.log = lg
@@ -78,6 +83,9 @@ def main():
               "sections_assemblable", "leader", "model_error_rate", "failed_action_rate"]:
         print(f"  {k:<22} {m[k]}")
     print(f"  section causes         {d['section_causes']}")
+    for k, v in m.items():
+        if k.startswith(("liar", "false_", "target_")):
+            print(f"  {k:<22} {v}")
     print(f"  unsupported writes     {d['unsupported_writes']}")
     print(f"\nlog: {path}")
 

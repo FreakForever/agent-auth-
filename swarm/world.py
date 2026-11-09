@@ -109,6 +109,29 @@ def make_facts(seed: int, n_sections: int, n_agents: int):
             return facts, fragments, holdings
 
 
+def make_compromise(seed: int, holdings, fragments, compromised: list[int]) -> dict[int, dict]:
+    """Phase 8. For each compromised agent: one of its OWN halves that it must misreport,
+    and the false value. The agent is the only holder of that half, so the truth exists
+    nowhere else in the team. Deterministic per (seed, agent). Empty dict when off."""
+    used = {v for pair in fragments for v in pair}
+    out = {}
+    for a in compromised:
+        rng = random.Random(f"liar-{seed}-{a}")
+        own = sorted(holdings[a])
+        nums = [h for h in own if h[1] == 1]          # prefer a number half (part B)
+        s, p = rng.choice(nums or own)
+        true = fragments[s][p]
+        if p == 1:
+            false = true
+            while false in used:
+                false = str(rng.randint(1000, 9999))
+        else:
+            false = rng.choice([w for w in _WORDS if w not in used])
+        used.add(false)
+        out[a] = {"section": s, "part": "AB"[p], "true": true, "false": false}
+    return out
+
+
 # ---------------------------------------------------------------------------
 # World
 # ---------------------------------------------------------------------------
@@ -135,6 +158,8 @@ class World:
             seed, settings.N_SECTIONS, self.n
         )
         self.order_rng = random.Random(seed + 10_000)
+        self.compromise = make_compromise(
+            seed, self.holdings, self.fragments, config.compromised_agents)
 
         self.round = 0
         self.pool_credits = settings.POOL_START
@@ -172,7 +197,7 @@ class World:
             for p in self.proposals.values()
             if p.author == a or p.author in self.neighbors(a)
         ]
-        return {
+        obs = {
             "round": self.round,
             "agent_id": a,
             "reward_mode": self.cfg.reward_mode.value,
@@ -193,6 +218,9 @@ class World:
             "my_recent_actions": self.history[a][-settings.MESSAGE_HISTORY_ROUNDS:],
             "my_reward": self._rewards()[a],
         }
+        if a in self.compromise:  # Phase 8 only; normal observations are unchanged
+            obs["secret"] = dict(self.compromise[a])
+        return obs
 
     # -- action resolution --------------------------------------------------
     def _resolve(self, a: int, turn: Optional[AgentTurn]) -> dict:
@@ -357,6 +385,7 @@ class World:
                 [next(a for a in range(self.n) if (s, p) in self.holdings[a]) for p in (0, 1)]
                 for s in range(settings.N_SECTIONS)
             ],
+            compromise={str(a): c for a, c in self.compromise.items()} or None,
         ))
         outcome = None
         while outcome is None:

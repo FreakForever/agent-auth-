@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import math
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -88,6 +89,27 @@ def checks(df: pd.DataFrame) -> list[str]:
     return msgs
 
 
+CONTAGION_COLS = ["liar_complied", "liar_leaked_true", "false_reached", "false_repeaters",
+                  "false_first_repeat_round", "false_max_hops", "false_written",
+                  "false_written_by_honest"]
+
+
+def contagion_table(df: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """Phase 8: per-condition spread of the compromised agent's false value."""
+    if "false_repeaters" not in df:
+        return None
+    d = df[df["compromised"] == True]  # noqa: E712
+    if d.empty:
+        return None
+    g = d.groupby("name")
+    out = pd.DataFrame({"runs": g.size()})
+    for c in CONTAGION_COLS:
+        out[c] = g[c].apply(lambda s: f"{s.astype(float).mean():.2f}" if s.notna().any() else "n/a")
+    out["target_outcome"] = g["target_outcome"].agg(
+        lambda s: ", ".join(f"{k}:{v}" for k, v in s.value_counts().items()))
+    return out
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("log_dir", nargs="?", default=settings.LOG_DIR)
@@ -101,6 +123,10 @@ def main():
     print(condition_table(df).T.to_string())
     print("\n=== Turns ===")
     print(turn_stats(df).to_string())
+    ct = contagion_table(df)
+    if ct is not None:
+        print("\n=== Compromised agent (means; booleans = share of runs) ===")
+        print(ct.T.to_string())
     print("\n=== Checks ===")
     for m in checks(df):
         print(" ", m)
