@@ -182,6 +182,9 @@ class LLMPool:
         _, fragments, holdings = make_facts(seed, settings.N_SECTIONS, cfg.n_agents)
         secrets = make_compromise(seed, holdings, fragments, cfg.compromised_agents)
         self.systems = {a: system_prompt(a, cfg, secrets.get(a)) for a in range(cfg.n_agents)}
+        # hooks so another task (swarm/secret_task.py) can reuse the batching/retry machinery
+        self.render = render_observation
+        self.parse = parse_turn
         self._round = 0
 
     def preflight(self) -> None:
@@ -222,7 +225,7 @@ class LLMPool:
         model = self.cfg.model_for(agent_id)
         messages = [
             {"role": "system", "content": self.systems[agent_id]},
-            {"role": "user", "content": render_observation(obs)},
+            {"role": "user", "content": self.render(obs)},
         ]
         raw_all, err = [], None
         for attempt in range(settings.JSON_RETRIES + 1):
@@ -233,7 +236,7 @@ class LLMPool:
                 raw_all.append(raw)
                 continue
             raw_all.append(raw)
-            turn, err = parse_turn(raw)
+            turn, err = self.parse(raw)
             if turn is not None:
                 return Decision(turn=turn, raw_output=raw, model=model,
                                 valid_json=True, retries=attempt)

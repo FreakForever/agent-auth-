@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Optional
 
 from swarm import settings
-from swarm.config import ExperimentConfig
+from swarm.config import ExperimentConfig, TaskMode
 from swarm.logger import JsonlLogger
 from swarm.world import World
 
@@ -46,8 +46,13 @@ def _default_pool(cfg, seed):
 
 def run_one(cfg: ExperimentConfig, seed: int, log_dir: str,
             pool_factory: Optional[Callable] = None):
-    pool = (pool_factory or _default_pool)(cfg, seed)
-    world = World(cfg, seed, pool, None)
+    if cfg.task_mode != TaskMode.normal:   # Phase 9 secret-passphrase task
+        from swarm.secret_task import SecretEpisode, secret_pool
+        pool = (pool_factory or secret_pool)(cfg, seed)
+        world = SecretEpisode(cfg, seed, pool, None)
+    else:
+        pool = (pool_factory or _default_pool)(cfg, seed)
+        world = World(cfg, seed, pool, None)
     path = os.path.join(log_dir, f"{world.run_id}.jsonl")
     try:
         with JsonlLogger(path) as lg:
