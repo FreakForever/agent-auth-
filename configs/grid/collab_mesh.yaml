@@ -1,0 +1,6 @@
+# Phase 6 grid: topology=mesh, reward=collaborative. max_rounds from pilot v8 (see DECISIONS.md).
+name: grid_collab_mesh
+topology: mesh
+reward_mode: collaborative
+max_rounds: 47
+seeds: [0, 1, 2, 3, 4]

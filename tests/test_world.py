@@ -52,7 +52,8 @@ def test_hoarders_get_richer_than_sharers():
 def test_starvation_kills():
     # specialists claim 1/round == upkeep, so they survive; broken bots never act, so they starve
     w, end = run(["specialist"] * 6, max_rounds=20)
-    w2, end2 = run(["broken"] * 6, max_rounds=20)
+    # stall_rounds raised so the stall check (10) doesn't end the run before 10-credit agents die
+    w2, end2 = run(["broken"] * 6, max_rounds=20, stall_rounds=99)
     assert end.deaths == 0
     assert end2.outcome == Outcome.all_dead and end2.deaths == 6
     assert end2.invalid_json_count > 0
@@ -99,3 +100,19 @@ def test_log_has_every_turn(tmp_path):
     rounds = [r for r in recs if r.event == "round_end"]
     assert len(rounds) == end.turns
     assert len(turns) == 6 * end.turns   # nobody died
+
+def test_claiming_alone_does_not_prevent_stall():
+    # specialists claim 1/round and never write: claiming is not progress, so the run
+    # stalls after stall_rounds instead of running to max_rounds (pilot v7 regression)
+    _, end = run(["specialist"] * 6, max_rounds=50)
+    assert end.outcome == Outcome.stalled and end.turns == settings.STALL_ROUNDS
+
+
+def test_idle_agents_still_stall():
+    # agents that only message: no document change, no credits moved -> stall at stall_rounds
+    from swarm.agents.bots import SpecialistBot
+    pool = BotPool(["specialist"] * 6)
+    pool.bots = {i: SpecialistBot(i, action="send_message") for i in range(6)}
+    cfg = ExperimentConfig(name="t", max_rounds=30)
+    end = World(cfg, 0, pool, NullLogger()).run()
+    assert end.outcome == Outcome.stalled and end.turns == settings.STALL_ROUNDS

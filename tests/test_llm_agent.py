@@ -71,6 +71,22 @@ def test_render_observation_shows_state():
     assert "DOCUMENT:" in text and "(empty)" in text and "MESSAGES RECEIVED" in text
 
 
+def test_render_observation_shows_write_affordability():
+    pool = FakeClient(lambda *a: '{"action":{"type":"pass"}}')
+    obs = World(CFG, 0, LLMPool(CFG, 0, client=pool), None).observe(0)
+    # a write must leave enough for this round's upkeep (3 credits -> 0 -> removed)
+    assert "still pay this round's upkeep: yes" in render_observation({**obs, "credits": 4})
+    assert "still pay this round's upkeep: no (you have 3" in render_observation({**obs, "credits": 3})
+
+
+def test_solo_prompt_has_no_comms_actions_group_prompt_does():
+    solo = system_prompt(0, ExperimentConfig(name="s", n_agents=1, topology="none"))
+    group = system_prompt(0, CFG)
+    for a in ("send_message", "give_resource", "propose", "endorse"):
+        assert a not in solo and a in group
+    assert "neighbours" in group and "neighbours" not in solo
+
+
 def test_valid_reply_and_concurrency(tmp_path):
     client = FakeClient(lambda aid, n, kw: json.dumps(
         {"thought": "t", "action": {"type": "send_message", "to": "all", "text": f"hi from {aid}"}}))

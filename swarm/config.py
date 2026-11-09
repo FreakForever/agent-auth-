@@ -46,6 +46,10 @@ class ExperimentConfig(BaseModel):
     n_agents: int = settings.N_AGENTS
     max_rounds: int = settings.MAX_ROUNDS_CEILING
     stall_rounds: int = settings.STALL_ROUNDS
+    # per-agent starting credits; None = settings.AGENT_START_CREDITS. Used by the solo
+    # baseline, which gets the whole team's budget (n_agents x 10) so it tests combining
+    # codes, not multi-round budgeting that no single swarm agent needs.
+    start_credits: Optional[int] = Field(default=None, ge=0)
     seeds: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
     temperature: float = settings.TEMPERATURE
 
@@ -62,8 +66,15 @@ class ExperimentConfig(BaseModel):
         return self.model_mix[agent_id] if self.model_mix else settings.MODEL_NAME
 
     def config_hash(self) -> str:
-        """Hash of everything except seeds, so all seeds of a condition share it."""
-        d = self.model_dump(mode="json", exclude={"seeds"})
+        """Hash of everything except seeds, so all seeds of a condition share it.
+
+        Includes settings.snapshot() (frozen constants + PROMPT_VERSION) so a prompt or
+        settings change gives a new hash and swarm.run never skips or mixes runs across them.
+        """
+        d = {
+            "config": self.model_dump(mode="json", exclude={"seeds"}),
+            "settings": settings.snapshot(),
+        }
         return hashlib.sha1(json.dumps(d, sort_keys=True).encode()).hexdigest()[:10]
 
     @classmethod

@@ -30,7 +30,11 @@ metric and every comparison depends on them staying fixed across conditions.
   An agent that cannot pay upkeep dies (takes no further actions).
 - Writing a section costs 3 credits. Messages are free.
 - `claim_resource` takes at most 5 credits from the pool per action.
-- Each agent starts with 3 credits.
+- Solo baseline only: the agent starts with the whole team's budget (`start_credits: 60`),
+  so the baseline tests combining codes, not budgeting 6 writes alone (added 2026-11-09 after
+  pilot v6: 3/5 solo runs died or looped on credits while every code written was correct).
+- Each agent starts with 10 credits (changed from 3: with 3, agents starved within
+  3 rounds while messaging in smoke runs).
 - Conflicting claims resolve in a seeded random order each round.
 
 Budget sanity check: upkeep 6/round vs regen 10/round leaves 4 spare per round,
@@ -40,10 +44,13 @@ hoarding can starve agents.
 ## Rounds and termination
 - One round = every live agent observes, takes one action, then the world updates.
 - Messages sent in round t are delivered at the start of round t+1.
-- A run ends on: success (6/6 correct), all agents dead, stall
-  (10 rounds with no change to the file or any balance), or the ceiling (100 rounds).
-- Pilot runs use the ceiling only; the final cap is set from the pilot's
-  turn distribution (about 1.5-2x the 90th percentile).
+- A run ends on: success (6/6 correct), all agents dead, stall (10 rounds with no
+  change to the file), or the round cap. Briefly (pilot v7) claims also counted as
+  progress for the stall check; reverted because lone hoarders then kept runs alive to
+  the ceiling.
+- Pilot runs used the 100-round ceiling. **Final cap: `max_rounds: 47`** (set 2026-11-09)
+  = 2 x p90 of turns (23.3) over pilot v8 multi-agent runs (prompt v6, engine e2). No
+  pilot run hit the ceiling; longest 38 rounds. Too few successes to use success-only p90.
 
 ## Memory
 - Injected verbatim every round: role, incentive text, own fact, own balance,

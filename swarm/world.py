@@ -3,12 +3,12 @@
 One round:
   1. deliver last round's messages
   2. build an observation for every live agent
-  3. ask the agent pool for one decision per agent (bots now, LLMs in Phase 4)
+  3. ask the agent pool for one decision per agent (bots or LLMs)
   4. resolve actions in a seeded random order (matters when claims exceed the pool)
   5. charge upkeep (agents who can't pay die), regenerate the pool
   6. compute rewards, log round_end, check termination
 
-Task: 6 sections, each with a fact made of two fragments (e.g. "VELTRA" + "4471").
+Task: 6 sections, each with a fact made of two fragments (e.g. "WORD" + "1234").
 Fragments are dealt so no agent holds both halves of any section. A section only
 becomes correct when someone gathers both halves, so communication is required.
 """
@@ -91,7 +91,7 @@ def make_facts(seed: int, n_sections: int, n_agents: int):
 
     facts[s]      = "WORD-1234"   (ground truth, for humans)
     fragments[s]  = ("WORD", "1234")
-    holdings[a]   = [(section, part_index), ...]  two fragments per agent
+    holdings[a]   = [(section, part_index), ...]
     """
     rng = random.Random(f"facts-{seed}")  # same facts across conditions for a seed
     words = rng.sample(_WORDS, n_sections)
@@ -99,6 +99,8 @@ def make_facts(seed: int, n_sections: int, n_agents: int):
     facts = [f"{a}-{b}" for a, b in fragments]
 
     pieces = [(s, p) for s in range(n_sections) for p in (0, 1)]
+    if n_agents == 1:  # single-agent baseline: one agent holds every part
+        return facts, fragments, [pieces]
     per_agent = len(pieces) // n_agents
     while True:  # re-deal until nobody holds both halves of one section
         rng.shuffle(pieces)
@@ -136,7 +138,8 @@ class World:
 
         self.round = 0
         self.pool_credits = settings.POOL_START
-        self.credits = [settings.AGENT_START_CREDITS] * self.n
+        start = config.start_credits if config.start_credits is not None else settings.AGENT_START_CREDITS
+        self.credits = [start] * self.n
         self.alive = [True] * self.n
         self.document: list[Optional[str]] = [None] * settings.N_SECTIONS
         self.section_author: list[Optional[int]] = [None] * settings.N_SECTIONS
@@ -146,8 +149,7 @@ class World:
         self.proposals: dict[str, _Proposal] = {}
         self.invalid_json = 0
         self._doc_unchanged_rounds = 0
-        self.history: list[list[dict]] = [[] for _ in range(self.n)]  # own past actions\
-
+        self.history: list[list[dict]] = [[] for _ in range(self.n)]  # own past actions
 
     # -- topology ---------------------------------------------------------
     def neighbors(self, a: int) -> list[int]:
@@ -177,6 +179,7 @@ class World:
             "credits": self.credits[a],
             "pool": self.pool_credits,
             "neighbors": [b for b in self.neighbors(a) if self.alive[b]],
+            "removed": [b for b in range(self.n) if not self.alive[b]],
             "my_fragments": [
                 {"section": s, "title": SECTION_TITLES[s], "part": "AB"[p],
                  "value": self.fragments[s][p]}
@@ -186,8 +189,6 @@ class World:
             "document": list(self.document),
             "inbox": [m for m in self.inbox[a] if m["round"] > lo],
             "proposals": visible,
-            "note": self.notes[a],
-            "my_reward": self._rewards()[a],
             "note": self.notes[a],
             "my_recent_actions": self.history[a][-settings.MESSAGE_HISTORY_ROUNDS:],
             "my_reward": self._rewards()[a],
@@ -329,6 +330,8 @@ class World:
             credits=list(self.credits), alive=list(self.alive),
             document=list(self.document), rewards=self._rewards(),
         ))
+        # stall = document unchanged for stall_rounds rounds. Counting claims as progress was
+        # tried (pilot v7) and reverted: lone hoarders then kept runs alive to max_rounds.
         self._doc_unchanged_rounds = (
             self._doc_unchanged_rounds + 1 if self.document == doc_before else 0
         )

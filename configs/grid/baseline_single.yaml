@@ -1,0 +1,9 @@
+# Control: one agent holds all 12 parts and the whole team's budget (6 x 10 credits).
+# Confirms the model can do the task without cooperation (pilot v7: 5/5 in 6 rounds).
+name: grid_baseline_single
+n_agents: 1
+topology: none
+reward_mode: collaborative
+start_credits: 60
+max_rounds: 47
+seeds: [0, 1, 2, 3, 4]

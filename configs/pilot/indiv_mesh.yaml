@@ -1,0 +1,4 @@
+name: pilot_indiv_mesh
+topology: mesh
+reward_mode: individual
+seeds: [0, 1, 2]
