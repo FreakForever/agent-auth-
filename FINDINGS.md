@@ -107,6 +107,30 @@ The clearest failure mode in connected teams: the information is there, the writ
   anything**; the run stalled at round 10 with 0/6.
 - Across mesh runs: assemblable 5.2 / 5.8 vs correct 0.8 / 2.4.
 
+**Why don't they write? Causes checked against all 2,185 team turns in `logs/grid`:**
+
+| Possible cause | Evidence | Verdict |
+|---|---|---|
+| Output truncated at the 400-token cap | longest output 512 chars (~1/3 of the cap); 0 truncated | ruled out |
+| Replies failing to parse | 100% valid JSON; 1 retry in 2,185 turns | ruled out |
+| Writes attempted but blocked | 62 write attempts: 59 succeeded, 3 failed for credits | ruled out: they rarely *try* (3% of turns) |
+| Partner half mislabelled | in 568 cases the partner half was in the inbox labelled with the right section | not the main cause |
+| 3-round message window | 27% of "received both halves" cases (564/2,118) were no longer visible in the prompt | **partial cause** |
+| Behaviour | with own half + correctly labelled partner half visible + >=4 credits (568 agent-rounds), agents wrote in only **8%** | **main cause** |
+
+- What agents thought instead (keyword count over 463 such non-write rounds, categories overlap):
+  re-share / "remind" 61% ("I will continue to send my parts since no one has responded yet."),
+  ask for a part 27% (often one already in their inbox), credits/survival 15%, verify or wait
+  first 8% ("I should check if agent 0 has part B for section 1 before writing anything.").
+- Plausible explanations (interpretation, not proven): conversational mode (the model replies to
+  messages rather than acting on them); diffusion of responsibility (two agents can write each
+  section, each waits for the other); risk aversion (a wrong write "wastes" 3 credits); failing to
+  notice information already in a long prompt.
+- Supporting contrast: the same model solves the task 5/5 when one agent holds both halves itself
+  (baseline). It fails when one half arrives in someone else's message.
+- **Metric caveat:** `sections_assemblable` counts halves ever received, so it overstates what
+  agents could act on (27% had scrolled out of view). Say "received", not "knew", in the writeup.
+
 ## E1-R4. Talking until starving  `grid`
 
 - **57 of 70 agents who died (81%) never claimed a single credit** (collab 31/37, indiv 26/33).
