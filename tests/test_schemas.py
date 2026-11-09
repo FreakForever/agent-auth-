@@ -74,3 +74,17 @@ def test_log_records_roundtrip():
     for r in recs:
         back = parse_record(r.model_dump_json())
         assert type(back) is type(r)
+
+def test_start_credits_defaults_and_override():
+    from swarm import settings
+    from swarm.agents.bots import BotPool
+    from swarm.logger import NullLogger
+    from swarm.world import World
+    assert ExperimentConfig(name="x").start_credits is None
+    w = World(ExperimentConfig(name="x"), 0, BotPool(["sharer"] * 6), NullLogger())
+    assert w.credits == [settings.AGENT_START_CREDITS] * 6
+    base = ExperimentConfig.from_yaml("configs/pilot/baseline_single.yaml")
+    w = World(base, 0, BotPool(["sharer"]), NullLogger())
+    assert w.credits == [60]
+    with pytest.raises(ValueError):
+        ExperimentConfig(name="x", start_credits=-1)

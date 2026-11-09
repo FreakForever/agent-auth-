@@ -6,7 +6,7 @@ the per-condition config (Phase 1). These values stay fixed across conditions.
 import os
 
 # Bump on ANY change to prompt text in swarm/agents/llm_agent.py. Part of config_hash().
-PROMPT_VERSION = "v4"
+PROMPT_VERSION = "v6"  # v5: write-affordability line; v6: it counts upkeep, solo prompt has no comms actions
 
 # ---- Serving ----
 VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")

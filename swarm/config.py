@@ -46,6 +46,10 @@ class ExperimentConfig(BaseModel):
     n_agents: int = settings.N_AGENTS
     max_rounds: int = settings.MAX_ROUNDS_CEILING
     stall_rounds: int = settings.STALL_ROUNDS
+    # per-agent starting credits; None = settings.AGENT_START_CREDITS. Used by the solo
+    # baseline, which gets the whole team's budget (n_agents x 10) so it tests combining
+    # codes, not multi-round budgeting that no single swarm agent needs.
+    start_credits: Optional[int] = Field(default=None, ge=0)
     seeds: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
     temperature: float = settings.TEMPERATURE
 

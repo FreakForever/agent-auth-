@@ -40,8 +40,9 @@ def test_no_communication_cannot_succeed():
 
 
 def test_hoarders_never_finish():
-    _, end = run(["hoarder"] * 6)
-    assert end.facts_correct == 0 and end.outcome == Outcome.stalled
+    # hoarders claim every round, which counts as progress, so they run to max_rounds
+    _, end = run(["hoarder"] * 6, max_rounds=30)
+    assert end.facts_correct == 0 and end.outcome == Outcome.timeout
 
 
 def test_hoarders_get_richer_than_sharers():
@@ -100,3 +101,19 @@ def test_log_has_every_turn(tmp_path):
     rounds = [r for r in recs if r.event == "round_end"]
     assert len(rounds) == end.turns
     assert len(turns) == 6 * end.turns   # nobody died
+
+def test_claiming_counts_as_progress_for_stall():
+    # specialists claim 1/round and never write: the document never changes, but credits
+    # move every round, so the run must NOT stall (it runs to max_rounds)
+    _, end = run(["specialist"] * 6, max_rounds=15)
+    assert end.outcome == Outcome.timeout and end.turns == 15
+
+
+def test_idle_agents_still_stall():
+    # agents that only message: no document change, no credits moved -> stall at stall_rounds
+    from swarm.agents.bots import SpecialistBot
+    pool = BotPool(["specialist"] * 6)
+    pool.bots = {i: SpecialistBot(i, action="send_message") for i in range(6)}
+    cfg = ExperimentConfig(name="t", max_rounds=30)
+    end = World(cfg, 0, pool, NullLogger()).run()
+    assert end.outcome == Outcome.stalled and end.turns == settings.STALL_ROUNDS

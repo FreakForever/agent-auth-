@@ -72,8 +72,11 @@ def checks(df: pd.DataFrame) -> list[str]:
     msgs.append(f"{'OK  ' if err <= 0.1 else 'WARN'} mean model error rate {err:.1%} (want <= 10%)")
     none = df[(df["topology"] == "none") & ~df["name"].str.contains("baseline")]
     if len(none):
-        msgs.append(f"{'OK  ' if none.facts_correct.max() == 0 else 'WARN'} no-communication "
-                    f"runs max facts_correct = {none.facts_correct.max()} (want 0; >0 = guessing)")
+        g = int(none.guessed_correct.sum())
+        msgs.append(f"{'OK  ' if g == 0 else 'WARN'} no-messaging runs: {g} correct write(s) "
+                    f"by agents without both halves (want 0; >0 = guessing)")
+        msgs.append(f"INFO no-messaging runs: {int(none.relayed_correct.sum())} correct write(s) "
+                    f"using a half read off the shared document (document as a side channel)")
     multi = df[~df["name"].str.contains("baseline") & (df["topology"] != "none")]
     if len(multi) and multi["info_sharing_rate"].mean() < 0.3:
         msgs.append("WARN agents rarely share parts (info_sharing_rate < 0.3): read some logs")

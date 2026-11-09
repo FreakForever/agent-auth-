@@ -80,6 +80,19 @@ def diagnose(run: Run) -> dict:
         and not knew_both(timeline, t["agent_id"], run.fragments[t["action"]["section"]], t["round"])
         for t in run.turns
     )
+    # correct writes split by where the code came from:
+    #   guessed_correct: writer did not have both halves at that round (a lucky guess; should be 0)
+    #   relayed_correct: writer had both halves but did not start with both, so it learned at
+    #                    least one from others (messages or the shared document)
+    guessed_correct = relayed_correct = 0
+    for t in run.turns:
+        if t["action"]["type"] != "write_section" or not t["result"].get("correct"):
+            continue
+        s = t["action"]["section"]
+        if not knew_both(timeline, t["agent_id"], run.fragments[s], t["round"]):
+            guessed_correct += 1
+        elif t["agent_id"] not in run.holder[s] or len(set(run.holder[s])) > 1:
+            relayed_correct += 1
     counts = Counter(causes.values())
     return {
         "section_causes": causes,
@@ -88,4 +101,6 @@ def diagnose(run: Run) -> dict:
         "model_error_rate": model_error_rate,
         "high_model_error": model_error_rate > HIGH_MODEL_ERROR,
         "unsupported_writes": unsupported,
+        "guessed_correct": guessed_correct,
+        "relayed_correct": relayed_correct,
     }

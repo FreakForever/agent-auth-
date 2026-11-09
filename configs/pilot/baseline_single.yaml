@@ -1,6 +1,9 @@
 # Single agent holds all 12 parts. Tests whether the MODEL can do the task at all.
+# It gets the whole team's starting budget (6 agents x 10 credits), so it needs no claims:
+# with 10 credits, 3/5 runs died or looped on budgeting (pilot v6) despite every code being correct.
 name: baseline_single
 n_agents: 1
 topology: none
 reward_mode: collaborative
-seeds: [0, 1, 2]
+seeds: [0, 1, 2, 3, 4]
+start_credits: 60

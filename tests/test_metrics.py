@@ -197,3 +197,48 @@ def test_summary_and_series(tmp_path):
     run, _ = make_run(tmp_path, ["sharer"] * 6, name="c")
     s = round_series(run)
     assert len(s) == 6 * run.end["turns"]
+
+# ---------------- no-messaging control: guesses vs document side channel ----------------
+class _DocRelay(SharerBot):
+    """No messages possible (topology none). Holder of 0A writes '<A>-X' (a guess);
+    holder of 0B copies part A off the document and writes the true code."""
+    kind = "docrelay"
+
+    def act(self, obs):
+        mine = {(f["section"], f["part"]): f["value"] for f in obs["my_fragments"]}
+        doc = obs["document"][0]
+        if (0, "A") in mine and not doc:
+            return _turn({"type": "write_section", "section": 0, "content": f"{mine[(0, 'A')]}-X"})
+        if (0, "B") in mine and doc and mine[(0, "B")] not in doc:
+            return _turn({"type": "write_section", "section": 0,
+                          "content": f"{doc.split('-')[0]}-{mine[(0, 'B')]}"})
+        return _turn({"type": "claim_resource", "amount": 1})
+
+
+def test_document_side_channel_is_relayed_not_guessed(tmp_path):
+    pool = BotPool(["sharer"] * 6)
+    pool.bots = {i: _DocRelay(i) for i in range(6)}
+    run, _ = make_run(tmp_path, pool=pool, topology="none", max_rounds=4, stall_rounds=99)
+    d = diagnose(run)
+    assert run.rounds[-1]["document"][0] == "-".join(run.fragments[0])
+    assert (d["guessed_correct"], d["relayed_correct"], d["unsupported_writes"]) == (0, 1, 1)
+
+
+def test_lucky_guess_is_flagged(tmp_path):
+    from swarm.world import make_facts
+    facts = make_facts(0, 6, 6)[0]
+
+    class Oracle(SharerBot):   # "knows" the code without holding or receiving it
+        kind = "oracle"
+
+        def act(self, obs):
+            if self.id == 0 and not obs["document"][5]:
+                return _turn({"type": "write_section", "section": 5, "content": facts[5]})
+            return _turn({"type": "claim_resource", "amount": 1})
+
+    pool = BotPool(["sharer"] * 6)
+    pool.bots = {i: Oracle(i) for i in range(6)}
+    run, _ = make_run(tmp_path, pool=pool, topology="none", max_rounds=2, stall_rounds=99)
+    assert run.holder[5] and 0 not in run.holder[5]
+    d = diagnose(run)
+    assert (d["guessed_correct"], d["relayed_correct"]) == (1, 0)

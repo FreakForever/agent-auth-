@@ -297,5 +297,7 @@ def summarize_dir(log_dir: str = settings.LOG_DIR):
         d = diagnose(run)
         m["primary_cause"] = d["primary_cause"]
         m["high_model_error"] = d["high_model_error"]
+        for k in ("unsupported_writes", "guessed_correct", "relayed_correct"):
+            m[k] = d[k]
         rows.append({k: v for k, v in m.items() if not isinstance(v, list)})
     return pd.DataFrame(rows)

@@ -30,6 +30,9 @@ metric and every comparison depends on them staying fixed across conditions.
   An agent that cannot pay upkeep dies (takes no further actions).
 - Writing a section costs 3 credits. Messages are free.
 - `claim_resource` takes at most 5 credits from the pool per action.
+- Solo baseline only: the agent starts with the whole team's budget (`start_credits: 60`),
+  so the baseline tests combining codes, not budgeting 6 writes alone (added 2026-11-09 after
+  pilot v6: 3/5 solo runs died or looped on credits while every code written was correct).
 - Each agent starts with 10 credits (changed from 3: with 3, agents starved within
   3 rounds while messaging in smoke runs).
 - Conflicting claims resolve in a seeded random order each round.
@@ -42,7 +45,9 @@ hoarding can starve agents.
 - One round = every live agent observes, takes one action, then the world updates.
 - Messages sent in round t are delivered at the start of round t+1.
 - A run ends on: success (6/6 correct), all agents dead, stall
-  (10 rounds with no change to the file or any balance), or the ceiling (100 rounds).
+  (10 rounds with no progress: the file did not change and no credits were claimed or
+  given; upkeep alone does not count. Changed 2026-11-09: a document-only rule ended runs
+  while an agent was saving credits to write), or the ceiling (100 rounds).
 - Pilot runs use the ceiling only; the final cap is set from the pilot's
   turn distribution (about 1.5-2x the 90th percentile).
 

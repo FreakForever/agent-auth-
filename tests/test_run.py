@@ -20,7 +20,7 @@ def test_single_sharer_solves_baseline(tmp_path):
     cfg = ExperimentConfig.from_yaml("configs/pilot/baseline_single.yaml")
     paths = run_condition(cfg, str(tmp_path), pool_factory=bots("sharer"), verbose=False)
     df = summarize_dir(str(tmp_path))
-    assert len(paths) == 3 and (df.facts_correct == 6).all()
+    assert len(paths) == len(cfg.seeds) and (df.facts_correct == 6).all()
 
 
 def test_parallel_and_resume(tmp_path):
@@ -50,5 +50,5 @@ def test_report_and_cap(tmp_path):
     cap = recommend_cap(df)
     assert cap["cap"] >= 20 and cap["basis"] == "successful runs"
     msgs = checks(df)
-    assert any(m.startswith("OK") and "no-communication" in m for m in msgs)
+    assert any(m.startswith("OK") and "no-messaging" in m for m in msgs)
     assert "none:" in table.loc["pilot_mesh", "causes"]
