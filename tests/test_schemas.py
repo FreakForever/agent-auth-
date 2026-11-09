@@ -6,11 +6,32 @@ from swarm.config import (
 
 
 def test_config_loads_and_hash_ignores_seeds():
-    c = ExperimentConfig.from_yaml("configs/pilot_collab_mesh.yaml")
+    c = ExperimentConfig.from_yaml("configs/pilot/collab_mesh.yaml")
     c2 = c.model_copy(update={"seeds": [9]})
     assert c.config_hash() == c2.config_hash()
     c3 = ExperimentConfig.model_validate({**c.model_dump(), "reward_mode": "individual"})
     assert c.config_hash() != c3.config_hash()
+
+
+def test_config_hash_changes_with_prompt_version_and_settings(monkeypatch):
+    from swarm import settings
+    c = ExperimentConfig.from_yaml("configs/pilot/collab_mesh.yaml")
+    h = c.config_hash()
+    assert settings.snapshot()["PROMPT_VERSION"] == settings.PROMPT_VERSION
+    monkeypatch.setattr(settings, "PROMPT_VERSION", "v-test")
+    assert c.config_hash() != h
+    monkeypatch.undo()
+    assert c.config_hash() == h
+    monkeypatch.setattr(settings, "AGENT_START_CREDITS", 999)
+    assert c.config_hash() != h
+
+
+def test_snapshot_excludes_endpoint_and_paths():
+    from swarm import settings
+    snap = settings.snapshot()
+    for k in ("VLLM_BASE_URL", "VLLM_API_KEY", "ROOT", "LOG_DIR", "CONFIG_DIR"):
+        assert k not in snap
+    assert snap["AGENT_START_CREDITS"] == 10
 
 
 def test_config_rejects_bad_compromised_id():

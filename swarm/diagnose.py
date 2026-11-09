@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections import Counter
 
 from swarm import settings
-from swarm.metrics import Run, knowledge, shared_values
+from swarm.metrics import Run, knew_both, knowledge, knowledge_timeline, shared_values
 
 HIGH_MODEL_ERROR = 0.2  # flag runs where >20% of turns were invalid output
 
@@ -33,6 +33,7 @@ def _was_correct(run: Run, s: int) -> bool:
 def diagnose(run: Run) -> dict:
     final_doc = run.rounds[-1]["document"] if run.rounds else [None] * settings.N_SECTIONS
     known = knowledge(run)
+    timeline = knowledge_timeline(run)
     shared = shared_values(run)
 
     knowers = {
@@ -63,18 +64,20 @@ def diagnose(run: Run) -> dict:
             continue
         writes = [t for t in run.turns
                   if t["action"]["type"] == "write_section" and t["result"].get("section") == s]
-        if writes and writes[-1]["agent_id"] in knowers[s]:
-            causes[s] = "misreported"
-        elif any(a in died or a in broke for a in knowers[s]):
+        if writes and knew_both(timeline, writes[-1]["agent_id"], run.fragments[s], writes[-1]["round"]):
+            causes[s] = "misreported"   # the writer had both halves at that moment, and still got it wrong
+        elif all(a in died or a in broke for a in knowers[s]):
+            # only if EVERY agent who could have written it was blocked; if any knower was
+            # alive and never short of credits, the failure is behavioural (not_written)
             causes[s] = "resource_blocked"
         else:
             causes[s] = "not_written"
 
     n_turns = len(run.turns) or 1
     model_error_rate = sum(not t["valid_json"] for t in run.turns) / n_turns
-    unsupported = sum(  # writes by agents who did not have both halves (guessing)
+    unsupported = sum(  # writes by agents who did not have both halves AT THAT ROUND (guessing)
         t["action"]["type"] == "write_section" and t["result"].get("ok")
-        and t["agent_id"] not in knowers[t["action"]["section"]]
+        and not knew_both(timeline, t["agent_id"], run.fragments[t["action"]["section"]], t["round"])
         for t in run.turns
     )
     counts = Counter(causes.values())

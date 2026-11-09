@@ -83,22 +83,52 @@ def _mentions(text: str, value: str) -> bool:
     return re.search(rf"\b{re.escape(value.lower())}\b", (text or "").lower()) is not None
 
 
-def knowledge(run: Run) -> list[set[str]]:
-    """Fragment values each agent knew by the end: its own, plus any value that
-    appeared in a successful message sent to it."""
-    known = [set() for _ in range(run.n)]
+def knowledge_timeline(run: Run) -> list[dict[str, int]]:
+    """For each agent: fragment value -> first round in which the agent could USE it.
+
+    Channels:
+      own parts                    usable from round 1 (recorded as 0)
+      message sent in round t      usable from round t+1 (delivery delay)
+      value written into the doc   usable by everyone from round t+1 (the document is public)
+    Anything that would only arrive after the run ended is ignored.
+    """
+    last = run.rounds[-1]["round"] if run.rounds else 0
+    learned: list[dict[str, int]] = [dict() for _ in range(run.n)]
+
+    def learn(a: int, v: str, r: int):
+        if r <= last and r < learned[a].get(v, 10 ** 9):
+            learned[a][v] = r
+
     for s, (ha, hb) in enumerate(run.holder):
-        known[ha].add(run.fragments[s][0])
-        known[hb].add(run.fragments[s][1])
+        learn(ha, run.fragments[s][0], 0)
+        learn(hb, run.fragments[s][1], 0)
     all_values = [v for pair in run.fragments for v in pair]
     for t in run.turns:
-        a = t["action"]
-        if a["type"] == "send_message" and t["result"].get("ok"):
+        a, r = t["action"], t["round"]
+        if not t["result"].get("ok"):
+            continue
+        if a["type"] == "send_message":
             for v in all_values:
                 if _mentions(a["text"], v):
                     for to in t["result"]["to"]:
-                        known[to].add(v)
-    return known
+                        learn(to, v, r + 1)
+        elif a["type"] == "write_section":
+            for v in all_values:
+                if _mentions(a["content"], v):
+                    for b in range(run.n):
+                        learn(b, v, r + 1)
+    return learned
+
+
+def knowledge(run: Run) -> list[set[str]]:
+    """Fragment values each agent could use by the end of the run."""
+    return [set(d) for d in knowledge_timeline(run)]
+
+
+def knew_both(timeline: list[dict[str, int]], agent: int, pair: tuple, by_round: int) -> bool:
+    a, b = pair
+    t = timeline[agent]
+    return t.get(a, 10 ** 9) <= by_round and t.get(b, 10 ** 9) <= by_round
 
 
 def shared_values(run: Run) -> set[str]:

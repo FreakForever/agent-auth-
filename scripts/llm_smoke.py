@@ -1,4 +1,4 @@
-"""Phase 4 exit check: one short real LLM run through the full pipeline.
+"""One short real LLM run through the full pipeline.
 
 Usage:
     python scripts/llm_smoke.py                       # 6 agents, mesh, collaborative, 15 rounds
@@ -57,6 +57,7 @@ def main():
     cfg = ExperimentConfig(name="smoke", topology=a.topology, reward_mode=a.reward,
                            max_rounds=a.rounds, seeds=[a.seed])
     pool = LLMPool(cfg, a.seed, json_mode=not a.no_json_mode)
+    pool.preflight()
     world = World(cfg, a.seed, pool, None)
     path = os.path.join(settings.LOG_DIR, f"{world.run_id}.jsonl")
     print(f"model={settings.MODEL_NAME}  run={world.run_id}")

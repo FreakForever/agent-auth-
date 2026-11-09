@@ -1,0 +1,5 @@
+# No communication. Should score 0: any correct section means the model guessed.
+name: pilot_none
+topology: none
+reward_mode: collaborative
+seeds: [0, 1]

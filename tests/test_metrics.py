@@ -97,15 +97,63 @@ def test_diagnose_success_has_no_causes(tmp_path):
 def test_diagnose_resource_blocked(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "POOL_START", 0)
     monkeypatch.setattr(settings, "POOL_REGEN", 0)
+    monkeypatch.setattr(settings, "AGENT_START_CREDITS", 3)  # too little to afford a write after upkeep
     run, _ = make_run(tmp_path, ["sharer"] * 6)
     d = diagnose(run)
     assert d["primary_cause"] == "resource_blocked"
 
 
-def test_diagnose_not_written(tmp_path):
-    # one round only: everyone broadcasts, nobody has time to write
-    run, _ = make_run(tmp_path, ["sharer"] * 6, max_rounds=1)
+def test_diagnose_not_written_when_only_some_knowers_died(tmp_path):
+    # Everyone broadcasts so all 6 know every code, but nobody writes. Agents 0-4 claim
+    # upkeep and stay alive with credits; agent 5 never claims and starves in round 10.
+    # One dead knower must not make it resource_blocked (smoke run s0, 2026-11-09).
+    class Talker(SharerBot):
+        kind = "talker"
+
+        def _writable(self, obs):
+            return []
+
+    class Starver(Talker):
+        kind = "starver"
+
+        def act(self, obs):
+            turn = super().act(obs)
+            return turn if turn.action.type == "send_message" else _turn({"type": "pass"})
+
+    pool = BotPool(["sharer"] * 6)
+    pool.bots = {i: Talker(i) for i in range(5)}
+    pool.bots[5] = Starver(5)
+    run, _ = make_run(tmp_path, pool=pool, max_rounds=12, stall_rounds=99)
+    assert not run.rounds[-1]["alive"][5] and all(run.rounds[-1]["alive"][:5])
     assert set(diagnose(run)["section_causes"].values()) == {"not_written"}
+
+
+def test_diagnose_not_written(tmp_path):
+    # round 1: everyone broadcasts; round 2: everyone has both halves but is saving credits
+    run, _ = make_run(tmp_path, ["sharer"] * 6, max_rounds=2)
+    assert set(diagnose(run)["section_causes"].values()) == {"not_written"}
+
+
+def test_messages_from_final_round_never_arrive(tmp_path):
+    # one round only: parts are sent, but delivery would be in round 2, which never happens
+    run, _ = make_run(tmp_path, ["sharer"] * 6, max_rounds=1)
+    assert set(diagnose(run)["section_causes"].values()) == {"not_combined"}
+    assert compute_metrics(run)["sections_assemblable"] == 0
+
+
+def test_document_is_a_public_channel(tmp_path):
+    from swarm.metrics import knowledge_timeline
+    run, path = make_run(tmp_path, ["hoarder"] * 6, max_rounds=3, stall_rounds=99)
+    recs = read_log_dicts(path)
+    a_val = run.fragments[0][0]
+    holder = run.holder[0][0]
+    write = dict(next(r for r in recs if r["event"] == "turn" and r["agent_id"] == holder))
+    write.update(round=1, action={"type": "write_section", "section": 0, "content": f"{a_val}-0000"},
+                 result={"ok": True, "section": 0, "correct": False})
+    recs.insert(1, write)
+    tl = knowledge_timeline(Run(recs))
+    assert all(tl[b].get(a_val) in (0, 2) for b in range(6))   # everyone can use it from round 2
+    assert diagnose(Run(recs))["unsupported_writes"] == 1        # half a code is still a guess
 
 
 def test_diagnose_misreported(tmp_path):

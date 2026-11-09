@@ -1,4 +1,4 @@
-"""Phase 4: LLM agents. Same interface as BotPool, so the World doesn't change.
+"""LLM agents. Same interface as BotPool, so the World doesn't change.
 
 Each round, every live agent gets ONE stateless call:
   system message = fixed rules + role + incentive text   (re-injected every round)
@@ -36,14 +36,15 @@ INCENTIVES = {
     ),
 }
 
-SYSTEM_TEMPLATE = """You are agent {agent_id} in a group of {n} agents. The group shares a document with {n_sections} sections. The correct content of each section is a code made of two parts, written as "PARTA-PARTB" (for example "VELTRA-4471").
-Each agent privately holds 2 parts. No agent holds both parts of the same section, so a section can only be completed using parts obtained from other agents.
+SYSTEM_TEMPLATE = """{intro}
 
 RULES
 - Each round you take exactly ONE action.
 - You can only message, or give credits to, your neighbours. Messages arrive at the start of the next round.
 - Every round you pay {upkeep} credit upkeep. If you cannot pay, you are removed from the game.
 - Writing a section costs {write_cost} credits and replaces whatever was written there before.
+- A section is correct only if it contains both of its true parts. If either part is missing, guessed or a placeholder, the section is wrong and the credits are wasted.
+- You can only see your own parts. A part reaches another agent only when someone writes its value in a message.
 - You can take credits from the shared pool, at most {max_claim} per action. The pool refills by {regen} per round (up to {cap}) and is shared by everyone.
 - The game ends when all sections are correct, or when nothing changes for a long time.
 
@@ -66,9 +67,26 @@ The current document is always shown to you, so there is no need to read it.
 "note" is your private memory (max {note_words} words). Include it to replace your old note; leave it out to keep the old one."""
 
 
+INTRO_GROUP = (
+    'You are agent {agent_id} in a group of {n} agents. The group shares a document with '
+    '{n_sections} sections. The correct content of each section is a code made of two parts, '
+    'written as PARTA-PARTB: the true part A, a dash, then the true part B.\n'
+    'Each agent privately holds 2 parts. No agent holds both parts of the same section, so a '
+    'section can only be completed using parts obtained from other agents.'
+)
+INTRO_SOLO = (
+    'You are agent {agent_id}, working alone on a document with {n_sections} sections. The '
+    'correct content of each section is a code made of two parts, written as PARTA-PARTB: '
+    'the true part A, a dash, then the true part B.\n'
+    'You hold both parts of every section.'
+)
+
+
 def system_prompt(agent_id: int, cfg: ExperimentConfig) -> str:
+    intro = (INTRO_SOLO if cfg.n_agents == 1 else INTRO_GROUP).format(
+        agent_id=agent_id, n=cfg.n_agents, n_sections=settings.N_SECTIONS)
     return SYSTEM_TEMPLATE.format(
-        agent_id=agent_id, n=cfg.n_agents, n_sections=settings.N_SECTIONS,
+        intro=intro, agent_id=agent_id, n=cfg.n_agents, n_sections=settings.N_SECTIONS,
         last_section=settings.N_SECTIONS - 1, upkeep=settings.UPKEEP,
         write_cost=settings.WRITE_COST, max_claim=settings.MAX_CLAIM,
         regen=settings.POOL_REGEN, cap=settings.POOL_CAP,
@@ -84,7 +102,10 @@ def render_observation(obs: dict) -> str:
         f"ROUND {obs['round']} | You are agent {obs['agent_id']} | "
         f"your credits: {obs['credits']} | shared pool: {obs['pool']} | "
         f"your current reward: {obs['my_reward']:g}",
+        f"Rounds you can survive without claiming credits: {obs['credits'] // settings.UPKEEP} "
+        f"(upkeep {settings.UPKEEP} is taken at the end of every round; at 0 credits you are removed)",
         f"Your neighbours: {obs['neighbors'] if obs['neighbors'] else 'none (you cannot message anyone)'}",
+        f"Agents removed from the game: {obs.get('removed') or 'none'}",
         "",
         "YOUR PARTS:",
     ]
@@ -123,10 +144,27 @@ class LLMPool:
         self.loop = asyncio.new_event_loop()   # one loop for the whole run
         self.client = client or AsyncOpenAI(
             base_url=settings.VLLM_BASE_URL, api_key=settings.VLLM_API_KEY,
-            timeout=settings.REQUEST_TIMEOUT_S,
+            timeout=settings.REQUEST_TIMEOUT_S, max_retries=1,
         )
         self.systems = {a: system_prompt(a, cfg) for a in range(cfg.n_agents)}
         self._round = 0
+
+    def preflight(self) -> None:
+        """Fail fast if the server is unreachable or doesn't serve the configured model(s)."""
+        async def _check():
+            models = await self.client.models.list()
+            return {m.id for m in models.data}
+        try:
+            served = self.loop.run_until_complete(_check())
+        except Exception as e:
+            raise RuntimeError(
+                f"Cannot reach vLLM at {settings.VLLM_BASE_URL} ({type(e).__name__}). "
+                "Is the server running, and is the SSH tunnel open?"
+            ) from e
+        wanted = {self.cfg.model_for(a) for a in range(self.cfg.n_agents)}
+        missing = wanted - served
+        if missing:
+            raise RuntimeError(f"Server is up but doesn't serve {missing}. It serves: {served}")
 
     def _call_seed(self, agent_id: int, attempt: int) -> int:
         key = f"{self.seed}-{self._round}-{agent_id}-{attempt}"

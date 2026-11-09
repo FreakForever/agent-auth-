@@ -52,7 +52,8 @@ def test_hoarders_get_richer_than_sharers():
 def test_starvation_kills():
     # specialists claim 1/round == upkeep, so they survive; broken bots never act, so they starve
     w, end = run(["specialist"] * 6, max_rounds=20)
-    w2, end2 = run(["broken"] * 6, max_rounds=20)
+    # stall_rounds raised so the stall check (10) doesn't end the run before 10-credit agents die
+    w2, end2 = run(["broken"] * 6, max_rounds=20, stall_rounds=99)
     assert end.deaths == 0
     assert end2.outcome == Outcome.all_dead and end2.deaths == 6
     assert end2.invalid_json_count > 0

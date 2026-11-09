@@ -1,0 +1,6 @@
+# Single agent holds all 12 parts. Tests whether the MODEL can do the task at all.
+name: baseline_single
+n_agents: 1
+topology: none
+reward_mode: collaborative
+seeds: [0, 1, 2]

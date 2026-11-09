@@ -30,7 +30,8 @@ metric and every comparison depends on them staying fixed across conditions.
   An agent that cannot pay upkeep dies (takes no further actions).
 - Writing a section costs 3 credits. Messages are free.
 - `claim_resource` takes at most 5 credits from the pool per action.
-- Each agent starts with 3 credits.
+- Each agent starts with 10 credits (changed from 3: with 3, agents starved within
+  3 rounds while messaging in smoke runs).
 - Conflicting claims resolve in a seeded random order each round.
 
 Budget sanity check: upkeep 6/round vs regen 10/round leaves 4 spare per round,
