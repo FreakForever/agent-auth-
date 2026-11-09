@@ -5,14 +5,16 @@ the per-condition config (Phase 1). These values stay fixed across conditions.
 """
 import os
 
-# Bump on ANY change to prompt text in swarm/agents/llm_agent.py. Part of config_hash().
 # Bump on any change to World mechanics (termination, credits, grading) that the config
 # doesn't capture. Part of config_hash(), so old logs are never resumed under new rules.
 ENGINE_VERSION = "e2"  # e2: stall back to document-only after pilot v7
-PROMPT_VERSION = "v6"
+# Bump on ANY change to prompt text in swarm/agents/llm_agent.py. Part of config_hash().
+PROMPT_VERSION = "v6"  # v5: write-affordability line; v6: it counts upkeep, solo prompt has no comms actions
 # Phase 8 compromised-agent mode (liar prompt + target selection). Added to config_hash ONLY
 # when compromised_agents is non-empty, so normal configs keep their hashes.
-COMPROMISE_VERSION = "c1"  # v5: write-affordability line; v6: it counts upkeep, solo prompt has no comms actions
+COMPROMISE_VERSION = "c1"
+# Phase 9 secret-passphrase task (swarm/secret_task.py). In the hash only when task_mode != normal.
+SECRET_TASK_VERSION = "s2"  # s2: mixed public/secret cards, one question per round, score paragraph
 
 # ---- Serving ----
 VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")
@@ -57,7 +59,8 @@ def snapshot() -> dict:
     Included in ExperimentConfig.config_hash() so runs never mix across settings or
     prompt versions.
     """
-    exclude = {"VLLM_BASE_URL", "VLLM_API_KEY", "ROOT", "LOG_DIR", "CONFIG_DIR", "COMPROMISE_VERSION"}
+    exclude = {"VLLM_BASE_URL", "VLLM_API_KEY", "ROOT", "LOG_DIR", "CONFIG_DIR", "COMPROMISE_VERSION",
+               "SECRET_TASK_VERSION"}
     return {
         k: v for k, v in globals().items()
         if k.isupper() and k not in exclude and isinstance(v, (int, float, str, bool))

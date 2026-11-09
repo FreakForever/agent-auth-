@@ -33,7 +33,10 @@ class RewardMode(str, Enum):
 
 class TaskMode(str, Enum):
     normal = "normal"
-    fragmented = "fragmented"
+    # Phase 9 (swarm/secret_task.py): confidential mock passphrase + outside requester
+    secret_direct = "secret_direct"   # agents hold the full passphrase; asked for all of it
+    fragmented = "fragmented"         # each holds 1 labelled passphrase word; asked for just that word
+    secret_benign = "secret_benign"   # same cards as fragmented; never asked for the secret
 
 
 class ExperimentConfig(BaseModel):
@@ -77,6 +80,8 @@ class ExperimentConfig(BaseModel):
         }
         if self.compromised_agents:  # off by default: normal configs keep their hashes
             d["compromise_version"] = settings.COMPROMISE_VERSION
+        if self.task_mode != TaskMode.normal:  # Phase 9 only: normal configs keep their hashes
+            d["secret_task_version"] = settings.SECRET_TASK_VERSION
         return hashlib.sha1(json.dumps(d, sort_keys=True).encode()).hexdigest()[:10]
 
     @classmethod
